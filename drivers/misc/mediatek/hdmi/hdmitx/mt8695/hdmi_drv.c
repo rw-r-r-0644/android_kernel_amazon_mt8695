@@ -173,11 +173,9 @@ static HDMI_UTIL_FUNCS hdmi_util = { 0 };
 static volatile unsigned int _HdmiTmrValue[MAX_HDMI_TMR_NUMBER];
 bool _fgWifiHdcpErr = FALSE;	/* for hdcp 2.x to 1.x converter */
 
-size_t display_off = 0;
 unsigned int u1hdcponoff_bak;
 static unsigned char hdmi_first_hdcp = 1;
 
-size_t display_off;
 unsigned char hdmi_plug_test_mode;
 unsigned char hdmi_is_boot_time;
 static unsigned hdmi_port_status_in_boot = 0xff;
@@ -1599,7 +1597,6 @@ static int hdmi_event_notifier_callback(struct notifier_block *self,
 	case FB_BLANK_UNBLANK:
 	case FB_BLANK_NORMAL:
 		printk("hdmi_late_resume \n");
-		display_off = 0;
 		/*hdmi_internal_power_on();*/
 		if(hdmi_suspend_en)
 			hdmi_internal_power_on();
@@ -1609,7 +1606,6 @@ static int hdmi_event_notifier_callback(struct notifier_block *self,
 		break;
 	case FB_BLANK_POWERDOWN:
 		printk("hdmi_early_suspend %d\n", hdmi_suspend_en);
-		display_off = 1;
 		/*hdmi_internal_power_off();*/
 		if(hdmi_suspend_en) {
 			hdmi_internal_power_off();
@@ -2321,7 +2317,7 @@ static int attach_input_hdmidev(void)
 
 	/* Indicate that we generate key events */
 	set_bit(EV_KEY, input->evbit);
-	__set_bit(KEY_POWER, input->keybit);
+	__set_bit(KEY_WAKEUP, input->keybit);
 
 	input->name = "hdmipower";
 	ret = input_register_device(input);
@@ -2337,21 +2333,12 @@ err_free_mem:
 
 int report_virtual_hdmikey(void)
 {
-	if ((display_off == 0) || (display_off == 2)) {
-		TX_DEF_LOG("[CECWAKE] display is already on, display_off=%d\n", (int)display_off);
-		return 0;
-	}
-
-	/* avoid sending duplicate keys in case two power on commands came too
-	   close to each other such as <routing info> and <set stream path>.
-	   Using a value of 2 to indicate KEY_POWER is being sent already. */
-	display_off = 2;
-	input_report_key(input, KEY_POWER, 1);
+	TX_DEF_LOG("[CECWAKE] display is being turned on, sending KEY_WAKEUP\n");
+	input_report_key(input, KEY_WAKEUP, 1);
 	input_sync(input);
 
-	input_report_key(input, KEY_POWER, 0);
+	input_report_key(input, KEY_WAKEUP, 0);
 	input_sync(input);
-	TX_DEF_LOG("[CECWAKE] display was off and is being turned on\n");
 	return 0;
 }
 
